@@ -21,6 +21,7 @@ void Central::receberMensagem(MensagemIncendio msg) {
     pthread_mutex_unlock(&mutex_fila);
 }
 
+// Helper estático que chama cicloDeVida
 void* Central::threadHelper(void* context) {
     ((Central*)context)->cicloDeVida();
     return NULL;
@@ -54,45 +55,56 @@ bool Central::isIncendioDuplicado(const Coordenada& local_fogo) {
 }
 
 void Central::apagarIncendio(DadosBombeiro* dados) {
-
     // aqui ele apaga o fogo e diz que tá livre pro código
     dados->floresta->setTipo(dados->x, dados->y, TIPO_LIVRE);
 }
 
+bool Central::obterProximaMensagem(MensagemIncendio& msg) {
+    pthread_mutex_lock(&mutex_fila);
+
+    if (fila_mensagens.empty()) {
+        pthread_mutex_unlock(&mutex_fila);
+        return false;
+    }
+
+    msg = fila_mensagens.front();
+    fila_mensagens.erase(fila_mensagens.begin());
+
+    pthread_mutex_unlock(&mutex_fila);
+    return true;
+}
+
+void Central::processarIncendio(const MensagemIncendio& msg) {
+    if (incendioJaAtendido(msg.local_fogo)) {
+        return;
+    }
+
+    incendios_atendidos.push_back(msg.local_fogo);
+
+    RegistraLog(msg);
+
+    DadosBombeiro* dados = new DadosBombeiro{
+        floresta,
+        msg.local_fogo.x,
+        msg.local_fogo.y,
+        this
+    };
+
+    spawnBombeiro(dados);
+}
+
+void Central::spawnBombeiro(DadosBombeiro* dados) {
+    pthread_t t;
+    pthread_create(&t, NULL, &Central::rotinaBombeiro, dados);
+    pthread_detach(t);
+}
+
 void Central::cicloDeVida() {
     while (ativa) {
-        MensagemIncendio msgAtual;
-        bool temMensagem = false;
+        MensagemIncendio msg;
 
-        pthread_mutex_lock(&mutex_fila);
-        if (!fila_mensagens.empty()) {
-            msgAtual = fila_mensagens.front();
-            fila_mensagens.erase(fila_mensagens.begin());
-            temMensagem = true;
-        }
-        pthread_mutex_unlock(&mutex_fila);
-
-        if (temMensagem) {
-
-            bool duplicado = incendioJaAtendido(msgAtual.local_fogo);
-
-            if (!duplicado) {
-                incendios_atendidos.push_back(msgAtual.local_fogo);
-
-                RegistraLog(msgAtual);
-
-                pthread_t t_bombeiro;
-
-                DadosBombeiro* dados = new DadosBombeiro{
-                    floresta,
-                    msgAtual.local_fogo.x,
-                    msgAtual.local_fogo.y,
-                    this   
-                };
-
-                pthread_create(&t_bombeiro, NULL, &Central::rotinaBombeiro, dados);
-                pthread_detach(t_bombeiro);
-            }
+        if (obterProximaMensagem(msg)) {
+            processarIncendio(msg);
         }
 
         usleep(100000);
@@ -120,9 +132,9 @@ void* Central::rotinaBombeiro(void* arg) {
     // e não tem acesso ao 'this'. Então o ponteiro da Central
     // é enviado dentro de DadosBombeiro para permitir chamar
     // métodos da Central a partir da thread.
-    
-    //dados->central acessa os membros da struct 
-    //-> apagarIncendio chama o método
+
+    // dados->central acessa os membros da struct
+    // -> apagarIncendio chama o método
     dados->central->apagarIncendio(dados);
 
     delete dados;
