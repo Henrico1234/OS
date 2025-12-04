@@ -22,6 +22,16 @@ void Central::receberMensagem(MensagemIncendio msg) {
     fila_mensagens.push_back(msg);
     pthread_mutex_unlock(&mutex_fila);
 }
+void Central::removerIncendio(Coordenada c) {
+    pthread_mutex_lock(&mutex_fila);
+    for (auto it = incendios_atendidos.begin(); it != incendios_atendidos.end(); ++it) {
+        if (it->x == c.x && it->y == c.y) {
+            incendios_atendidos.erase(it);
+            break;
+        }
+    }
+    pthread_mutex_unlock(&mutex_fila);
+}
 
 void Central::removerIncendio(Coordenada c) {
     pthread_mutex_lock(&mutex_fila);
