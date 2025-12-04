@@ -68,6 +68,11 @@ bool Central::isIncendioDuplicado(const Coordenada& local_fogo) {
     return false;
 }
 
+void Central::apagarIncendio(DadosBombeiro* dados) {
+    // aqui ele apaga o fogo e diz que tá livre pro código
+    dados->floresta->setTipo(dados->x, dados->y, TIPO_LIVRE);
+}
+
 bool Central::obterProximaMensagem(MensagemIncendio& msg) {
 
     // trava a fila, impedindo que outra thread acesse enquanto uma thread esteja acessando a fila  
@@ -140,7 +145,14 @@ void* Central::rotinaBombeiro(void* arg) {
 
     sleep(2);
 
-    dados->floresta->setTipo(dados->x, dados->y, TIPO_LIVRE);
+    // dados->central porque rotinaBombeiro é static
+    // e não tem acesso ao 'this'. 
+    // Então o ponteiro da Central é enviado dentro de DadosBombeiro para permitir chamar
+    // métodos da Central a partir da thread
+
+    // dados->central acessa os membros da struct
+    // -> apagarIncendio chama o método
+    dados->central->apagarIncendio(dados);
 
     Coordenada c = {dados->x, dados->y};
     dados->central->removerIncendio(c);

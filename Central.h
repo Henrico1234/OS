@@ -39,6 +39,7 @@ public:
     void iniciar();
     void aguardar();
 
+    void apagarIncendio(DadosBombeiro* dados);
     bool incendioJaAtendido(const Coordenada& coord);
     bool isIncendioDuplicado(const Coordenada& local_fogo);
 
